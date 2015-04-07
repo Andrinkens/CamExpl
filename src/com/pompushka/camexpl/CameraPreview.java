@@ -3,6 +3,9 @@ package com.pompushka.camexpl;
 import java.io.IOException;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.ImageFormat;
 import android.hardware.Camera;
 import android.hardware.Camera.Parameters;
 import android.hardware.Camera.PreviewCallback;
@@ -40,29 +43,19 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
     public void surfaceCreated(SurfaceHolder holder) {
         // The Surface has been created, now tell the camera where to draw the preview.
         try {
-            //parameters = mCamera.getParameters();
-            //parameters.setPreviewSize(320,480);
-            //mCamera.setParameters(parameters);
-            
+            parameters = mCamera.getParameters();
+            parameters.getSupportedPreviewFormats().toString();
+            mCamera.setParameters(parameters);
+
             mCamera.setPreviewDisplay(holder);
             mCamera.setPreviewCallback(this);
-/*            		new PreviewCallback() {
-
-				@Override
-				public void onPreviewFrame(byte[] data, Camera camera) {
-					//decodeYUV420SP(pixels, data, previewSize.width,  previewSize.height);
-					Log.d(TAG, "The top right pixel has the following RGB (hexadecimal) values:"  
-			                +Integer.toHexString(pixels[0])); 
-				}
-            	
-            }); */
             mCamera.startPreview();
             
             parameters = mCamera.getParameters();  
             previewSize = parameters.getPreviewSize();  
             pixels = new int[previewSize.width * previewSize.height]; 
             
-            Log.d(TAG, "Start");
+            Log.d(TAG, parameters.getSupportedPreviewFormats().toString());
             
             
         } catch (IOException e) {
@@ -80,25 +73,18 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
     }
 
     public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
-        // If your preview can change or rotate, take care of those events here.
-        // Make sure to stop the preview before resizing or reformatting it.
 
         if (mHolder.getSurface() == null){
           // preview surface does not exist
           return;
         }
 
-        // stop preview before making changes
         try {
             mCamera.stopPreview();
         } catch (Exception e){
           // ignore: tried to stop a non-existent preview
         }
 
-        // set preview size and make any resize, rotate or
-        // reformatting changes here
-
-        // start preview with new settings
         try {
         	parameters.setPreviewSize(w, h);
             mCamera.setPreviewDisplay(mHolder);
@@ -113,8 +99,8 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
 	@Override
 	public void onPreviewFrame(byte[] arg0, Camera arg1) {
 		decodeYUV420SP(pixels, arg0, previewSize.width,  previewSize.height);
-		Log.d(TAG, "The top right pixel has the following RGB (hexadecimal) values:"  
-                +Integer.toHexString(pixels[0])); 
+		//Log.d(TAG, "The top right pixel has the following RGB (hexadecimal) values:"  
+        //         +Integer.toHexString(pixels[0])); 
 	}
 	
 	void decodeYUV420SP(int[] rgb, byte[] yuv420sp, int width, int height) {  

@@ -17,6 +17,7 @@ public class MainActivity extends Activity {
 	private TextView tv;
 	private Camera myCam;
 	private CameraPreview mPreview;
+	private FilterView fPreview;
 	
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -24,7 +25,6 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         
-        tv = (TextView) findViewById(R.id.textView2);
         /*
         if (checkCameraHardware(getApplicationContext())) 
         	tv.setText("There are "+ String.valueOf(Camera.getNumberOfCameras()) + " cameras");
@@ -46,6 +46,10 @@ public class MainActivity extends Activity {
         mPreview = new CameraPreview(this, myCam);
         FrameLayout preview = (FrameLayout) findViewById(R.id.camera_preview);
         preview.addView(mPreview);
+        
+        fPreview = new FilterView(this);
+        FrameLayout previewf = (FrameLayout) findViewById(R.id.filter_preview);
+        previewf.addView(fPreview);
     }
     
     @Override
