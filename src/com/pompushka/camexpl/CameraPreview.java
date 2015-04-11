@@ -1,11 +1,15 @@
 package com.pompushka.camexpl;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.ImageFormat;
+import android.graphics.Rect;
+import android.graphics.YuvImage;
 import android.hardware.Camera;
 import android.hardware.Camera.Parameters;
 import android.hardware.Camera.PreviewCallback;
@@ -26,11 +30,15 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
     //this variable stores the camera preview size   
     private Size previewSize;  
     //this array stores the pixels as hexadecimal pairs   
-    private int[] pixels; 
+    private int[] pixels;
+    
+    private FilterView fW;
 
-    public CameraPreview(Context context, Camera camera) {
+    public CameraPreview(Context context, Camera camera, FilterView view) {
         super(context);
         mCamera = camera;
+        
+        fW = view;
 
         // Install a SurfaceHolder.Callback so we get notified when the
         // underlying surface is created and destroyed.
@@ -99,8 +107,14 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
 	@Override
 	public void onPreviewFrame(byte[] arg0, Camera arg1) {
 		decodeYUV420SP(pixels, arg0, previewSize.width,  previewSize.height);
-		//Log.d(TAG, "The top right pixel has the following RGB (hexadecimal) values:"  
-        //         +Integer.toHexString(pixels[0])); 
+		YuvImage yuvImage = new YuvImage(arg0, ImageFormat.NV21, previewSize.width, previewSize.height, null);
+		ByteArrayOutputStream baos = new ByteArrayOutputStream(); 
+		yuvImage.compressToJpeg(new Rect(0, 0, previewSize.width, previewSize.height), 100, baos);
+		byte [] imageData = baos.toByteArray();
+		Bitmap previewBitmap = BitmapFactory.decodeByteArray(imageData , 0, imageData.length);
+		fW.setPreviewBmp(previewBitmap);
+		Log.d(TAG, "The top right pixel has the following RGB (hexadecimal) values:"  
+                 +Integer.toHexString(previewBitmap.getPixel(0, 0)));
 	}
 	
 	void decodeYUV420SP(int[] rgb, byte[] yuv420sp, int width, int height) {  

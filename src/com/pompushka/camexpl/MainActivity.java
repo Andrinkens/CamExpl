@@ -41,15 +41,16 @@ public class MainActivity extends Activity {
         
         // Create an instance of Camera
         myCam = getCameraInstance(1);
-
-        // Create our Preview view and set it as the content of our activity.
-        mPreview = new CameraPreview(this, myCam);
-        FrameLayout preview = (FrameLayout) findViewById(R.id.camera_preview);
-        preview.addView(mPreview);
         
         fPreview = new FilterView(this);
         FrameLayout previewf = (FrameLayout) findViewById(R.id.filter_preview);
         previewf.addView(fPreview);
+
+        // Create our Preview view and set it as the content of our activity.
+        mPreview = new CameraPreview(this, myCam, fPreview);
+        FrameLayout preview = (FrameLayout) findViewById(R.id.camera_preview);
+        preview.addView(mPreview);
+        
     }
     
     @Override
