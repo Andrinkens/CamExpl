@@ -2,6 +2,9 @@ package com.pompushka.camexpl;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.Buffer;
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -30,7 +33,11 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
     //this variable stores the camera preview size   
     private Size previewSize;  
     //this array stores the pixels as hexadecimal pairs   
-    private int[] pixels;
+    private byte[] pixelsB;
+    private int[] pixelsI;
+    
+    Bitmap.Config conf;
+    Bitmap previewBitmap;
     
     private FilterView fW;
 
@@ -61,7 +68,11 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
             
             parameters = mCamera.getParameters();  
             previewSize = parameters.getPreviewSize();  
-            pixels = new int[previewSize.width * previewSize.height]; 
+            pixelsB = new byte[previewSize.width * previewSize.height * 4];
+            pixelsI = new int[previewSize.width * previewSize.height];
+            
+    		conf = Bitmap.Config.ARGB_8888; // see other conf types
+    		previewBitmap = Bitmap.createBitmap(640, 480, conf);
             
             Log.d(TAG, parameters.getSupportedPreviewFormats().toString());
             
@@ -106,16 +117,123 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
 
 	@Override
 	public void onPreviewFrame(byte[] arg0, Camera arg1) {
-		decodeYUV420SP(pixels, arg0, previewSize.width,  previewSize.height);
+		//decodeYUV420SP(pixelsB, arg0, previewSize.width,  previewSize.height);
+		decodeYUV420SP(pixelsI, arg0, previewSize.width,  previewSize.height);
+		/*
 		YuvImage yuvImage = new YuvImage(arg0, ImageFormat.NV21, previewSize.width, previewSize.height, null);
 		ByteArrayOutputStream baos = new ByteArrayOutputStream(); 
 		yuvImage.compressToJpeg(new Rect(0, 0, previewSize.width, previewSize.height), 100, baos);
 		byte [] imageData = baos.toByteArray();
-		Bitmap previewBitmap = BitmapFactory.decodeByteArray(imageData , 0, imageData.length);
+		Bitmap previewBitmap1 = BitmapFactory.decodeByteArray(imageData , 0, imageData.length);
+		*/
+		//int pBlength = previewBitmap.getByteCount();
+		//ByteBuffer bytes = ByteBuffer.allocate(pBlength);
+		//previewBitmap.copyPixelsToBuffer(bytes);
+		//byte[] rfData = RobertsFilter(bytes.array());
+		//previewBitmap.copyPixelsFromBuffer(ByteBuffer.wrap(rfData));
+		/*
+		Bitmap previewBitmap2;
+		BitmapFactory.Options options = new BitmapFactory.Options();
+		//options.inMutable = true;
+		options.
+		previewBitmap2 = BitmapFactory.decodeByteArray(pixels, 0, pixels.length, options);
+		*/
+		
+		previewBitmap = Bitmap.createBitmap(RobertsFilter(pixelsI), previewSize.width, previewSize.height, conf);
+		//previewBitmap.copyPixelsFromBuffer(ByteBuffer.wrap(pixels));
+
+		
 		fW.setPreviewBmp(previewBitmap);
-		Log.d(TAG, "The top right pixel has the following RGB (hexadecimal) values:"  
-                 +Integer.toHexString(previewBitmap.getPixel(0, 0)));
+		
+		//Log.d(TAG, "The top right pixel has the following RGB (hexadecimal) values:"  
+        //         +Integer.toHexString(previewBitmap.getPixel(0, 0)));
 	}
+	
+	private byte[] RobertsFilter(byte[] dataIn){
+		byte[] dataOut = new byte[dataIn.length];
+		byte temp1,temp2 = 0;
+		
+		for (int i=0;i<previewSize.width*(previewSize.height-1)-1;i++){
+				//dataOut[4*i] = (byte) 0;//R
+				//dataOut[4*i+1] = (byte) 255;//G
+				//dataOut[4*i+2] = (byte) 0;//B
+				
+				temp1 = (byte) Math.abs(dataIn[4*i] - dataIn[4*(i+1) + previewSize.width*4]);
+				temp2 = (byte) Math.abs(dataIn[4*(i+1)] - dataIn[4*i + previewSize.width*4]);
+				dataOut[4*i] = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);
+				
+				temp1 = (byte) Math.abs(dataIn[4*i+2] - dataIn[4*(i+1) + previewSize.width*4 +1]);
+				temp2 = (byte) Math.abs(dataIn[4*(i+1)+1] - dataIn[4*i + previewSize.width*4 +1]);
+				dataOut[4*i+1] = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);
+				
+				temp1 = (byte) Math.abs(dataIn[4*i+2] - dataIn[4*(i+1) + previewSize.width*4 +2]);
+				temp2 = (byte) Math.abs(dataIn[4*(i+1)+2] - dataIn[4*i + previewSize.width*4 +2]);
+				dataOut[4*i+2] = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);
+		}
+		return dataOut;
+	}
+	
+	private int[] RobertsFilter(int[] dataIn){
+		int[] dataOut = new int[dataIn.length];
+		int temp1,temp2 = 0;
+		byte R,G,B;
+		
+		for (int i=0;i<previewSize.width*(previewSize.height-1)-1;i++){
+			
+				R = (byte) ((dataIn[i] & 0x00ff0000)>>16);
+				G = (byte) ((dataIn[i] & 0x0000ff00)>>8);
+				B = (byte) (dataIn[i] & 0x000000ff);
+				
+				dataOut[i] = (int)0x00000000 | (int)(R<<16) | (int)(G<<8) | (int)B;
+				/*
+				temp1 = Math.abs(dataIn[4*i] - dataIn[4*(i+1) + previewSize.width*4]);
+				temp2 = Math.abs(dataIn[4*(i+1)] - dataIn[4*i + previewSize.width*4]);
+				dataOut[4*i] = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);
+				
+				temp1 = (byte) Math.abs(dataIn[4*i+2] - dataIn[4*(i+1) + previewSize.width*4 +1]);
+				temp2 = (byte) Math.abs(dataIn[4*(i+1)+1] - dataIn[4*i + previewSize.width*4 +1]);
+				dataOut[4*i+1] = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);
+				
+				temp1 = (byte) Math.abs(dataIn[4*i+2] - dataIn[4*(i+1) + previewSize.width*4 +2]);
+				temp2 = (byte) Math.abs(dataIn[4*(i+1)+2] - dataIn[4*i + previewSize.width*4 +2]);
+				dataOut[4*i+2] = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);*/
+		}
+		return dataOut;
+	}
+	
+	void decodeYUV420SP(byte[] rgb, byte[] yuv420sp, int width, int height) {  
+        
+        final int frameSize = width * height;  
+
+        for (int j = 0, yp = 0; j < height; j++) {       int uvp = frameSize + (j >> 1) * width, u = 0, v = 0;  
+          for (int i = 0; i < width; i++, yp++) {  
+            int y = (0xff & ((int) yuv420sp[yp])) - 16;  
+            if (y < 0)  
+              y = 0;  
+            if ((i & 1) == 0) {  
+              v = (0xff & yuv420sp[uvp++]) - 128;  
+              u = (0xff & yuv420sp[uvp++]) - 128;  
+            }  
+
+            int y1192 = 1192 * y;  
+            int r = (y1192 + 1634 * v);  
+            int g = (y1192 - 833 * v - 400 * u);  
+            int b = (y1192 + 2066 * u);  
+
+            if (r < 0)                  r = 0;               else if (r > 262143)  
+               r = 262143;  
+            if (g < 0)                  g = 0;               else if (g > 262143)  
+               g = 262143;  
+            if (b < 0)                  b = 0;               else if (b > 262143)  
+               b = 262143;  
+
+            //rgb[yp] = 0xff000000 | ((r << 6) & 0xff0000) | ((g >> 2) & 0xff00) | ((b >> 10) & 0xff);
+            rgb[4*yp] = (byte) (r>>10);
+            rgb[4*yp+1] = (byte) (g >> 10);
+            rgb[4*yp+2] = (byte) (b >> 10); 
+          }  
+        }  
+      }
 	
 	void decodeYUV420SP(int[] rgb, byte[] yuv420sp, int width, int height) {  
         
