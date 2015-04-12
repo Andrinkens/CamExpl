@@ -139,8 +139,15 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
 		options.
 		previewBitmap2 = BitmapFactory.decodeByteArray(pixels, 0, pixels.length, options);
 		*/
+		/*
+		Log.d(TAG, "R:"+String.valueOf(pixelsB[toPos(320,240)+1] & 0xFF)+
+				   " G:"+String.valueOf(pixelsB[toPos(320,240)+2] & 0xFF)+
+				   " B:"+String.valueOf(pixelsB[toPos(320,240)+3] & 0xFF)+
+				   " A:"+String.valueOf(pixelsB[toPos(320,240)]& 0xFF));*/
 		
-		IntBuffer intBuf =	ByteBuffer.wrap(pixelsB).order(ByteOrder.BIG_ENDIAN).asIntBuffer();
+		IntBuffer intBuf =	ByteBuffer.wrap(find(pixelsB)).order(ByteOrder.BIG_ENDIAN).asIntBuffer();
+		//IntBuffer intBuf =	ByteBuffer.wrap(drawCross(pixelsB, toPos(320,240))).order(ByteOrder.BIG_ENDIAN).asIntBuffer();
+		
 		intBuf.get(pixelsI);
 		
 		previewBitmap = Bitmap.createBitmap(pixelsI, previewSize.width, previewSize.height, conf);
@@ -151,6 +158,110 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
 		
 		//Log.d(TAG, "The top right pixel has the following RGB (hexadecimal) values:"  
         //         +Integer.toHexString(previewBitmap.getPixel(0, 0)));
+	}
+	
+	private int toPos(int x,int y){
+		return x*4 + y*previewSize.width * 4;
+	}
+	
+	private byte[] find(byte[] dataIn){
+		byte[] dataOut = new byte[dataIn.length];
+		//dataOut = dataIn;
+		System.arraycopy(dataIn, 0, dataOut, 0, dataIn.length);
+		
+		byte sR = 1;//shift Red
+		byte sG = 2;//
+		byte sB = 3;//
+		int blueThresh = -100;
+		
+		int step = 1;
+		
+		for (int i=0;i<previewSize.width;i+=step)
+			for (int j=0;j<previewSize.height;j+=step){
+				if (dataIn[sB + toPos(i,j)] <= blueThresh &&
+					dataIn[sR + toPos(i,j)] >=0 &&
+					dataIn[sR + toPos(i,j)] <=5){
+					
+					dataOut[sB + toPos(i,j)] = 0;
+					dataOut[sR + toPos(i,j)] = (byte) 0xff;
+					dataOut[sG + toPos(i,j)] = 0;
+					//drawCross(dataOut, i,j);
+					
+					//Log.d(TAG, "R:"+String.valueOf(dataIn[toPos(i,j)+sR] & 0xFF)+
+					//		   " G:"+String.valueOf(dataIn[toPos(i,j)+sG] & 0xFF)+
+					//		   " B:"+String.valueOf(dataIn[toPos(i,j)+sB] & 0xFF)+
+					//		   " A:"+String.valueOf(dataIn[toPos(i,j)]& 0xFF));
+							   
+					//break;
+				}
+					
+			}
+		/*
+		for (int i=0;i<previewSize.width;i+=step)
+			for (int j=0;j<previewSize.height;j+=step){
+				if (dataIn[sB+4*i+j*previewSize.width*4]>=blueThresh && 
+					dataIn[sR+4*i+j*previewSize.width*4]<10 &&
+					dataIn[sG+4*i+j*previewSize.width*4]<100)
+				{
+					drawCross(dataOut,4*i+j*previewSize.width*4);
+					///Log.d(TAG, "Cross" + String.valueOf(dataIn[sB+i*4+j*previewSize.width]));
+					break;
+				}
+			}*/
+		return dataOut;
+	}
+	
+	private byte[] drawCross(byte[] dataIn, int x, int y){
+		byte sR = 1;//shift Red
+		byte sG = 2;//
+		byte sB = 3;//
+		
+		int size = 40;
+		int pos = 4*x+4*y*previewSize.width;
+		
+		if (sB + pos + (size/2)*4*previewSize.width >=4*previewSize.width*previewSize.height) return dataIn;
+		if (sB + pos + (-size/2)*4*previewSize.width <=0) return dataIn;
+		
+		for (int i=-size/2;i<size/2;i++){
+			dataIn[sR + pos + i*4] = (byte) 255;
+			dataIn[sG + pos + i*4] = (byte) 255;
+			dataIn[sB + pos + i*4] = (byte) 255;
+		}
+		
+		for (int i=-size/2;i<size/2;i++){
+			dataIn[sR + pos + i*4*previewSize.width] = (byte) 255;
+			dataIn[sG + pos + i*4*previewSize.width] = (byte) 255;
+			dataIn[sB + pos + i*4*previewSize.width] = (byte) 255;
+		}
+
+		
+		return dataIn;	
+	}
+	
+	private byte[] drawCross(byte[] dataIn, int pos){
+		byte sR = 1;//shift Red
+		byte sG = 2;//
+		byte sB = 3;//
+		
+		int size = 40;
+		
+		if (sB + pos + (size/2)*4*previewSize.width >=4*previewSize.width*previewSize.height) return dataIn;
+		if (sB + pos + (-size/2)*4*previewSize.width <=0) return dataIn;
+		
+		for (int i=-size/2;i<size/2;i++){
+			dataIn[sR + pos + i*4] = (byte) 255;
+			dataIn[sG + pos + i*4] = (byte) 255;
+			dataIn[sB + pos + i*4] = (byte) 255;
+		}
+		
+		for (int i=-size/2;i<size/2;i++){
+			dataIn[sR + pos + i*4*previewSize.width] = (byte) 255;
+			dataIn[sG + pos + i*4*previewSize.width] = (byte) 255;
+			dataIn[sB + pos + i*4*previewSize.width] = (byte) 255;
+		}
+
+		
+		return dataIn;	
 	}
 	
 	public int[] convert(byte buf[]) {
