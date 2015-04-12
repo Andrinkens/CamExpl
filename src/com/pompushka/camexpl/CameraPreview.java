@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 
 import android.content.Context;
@@ -117,8 +118,8 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
 
 	@Override
 	public void onPreviewFrame(byte[] arg0, Camera arg1) {
-		//decodeYUV420SP(pixelsB, arg0, previewSize.width,  previewSize.height);
-		decodeYUV420SP(pixelsI, arg0, previewSize.width,  previewSize.height);
+		decodeYUV420SP(pixelsB, arg0, previewSize.width,  previewSize.height);
+		//decodeYUV420SP(pixelsI, arg0, previewSize.width,  previewSize.height);
 		/*
 		YuvImage yuvImage = new YuvImage(arg0, ImageFormat.NV21, previewSize.width, previewSize.height, null);
 		ByteArrayOutputStream baos = new ByteArrayOutputStream(); 
@@ -139,7 +140,10 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
 		previewBitmap2 = BitmapFactory.decodeByteArray(pixels, 0, pixels.length, options);
 		*/
 		
-		previewBitmap = Bitmap.createBitmap(RobertsFilter(pixelsI), previewSize.width, previewSize.height, conf);
+		IntBuffer intBuf =	ByteBuffer.wrap(pixelsB).order(ByteOrder.BIG_ENDIAN).asIntBuffer();
+		intBuf.get(pixelsI);
+		
+		previewBitmap = Bitmap.createBitmap(pixelsI, previewSize.width, previewSize.height, conf);
 		//previewBitmap.copyPixelsFromBuffer(ByteBuffer.wrap(pixels));
 
 		
@@ -149,54 +153,81 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
         //         +Integer.toHexString(previewBitmap.getPixel(0, 0)));
 	}
 	
+	public int[] convert(byte buf[]) {
+		   int intArr[] = new int[buf.length / 4];
+		   int offset = 0;
+		   for(int i = 0; i < intArr.length; i++) {
+		      intArr[i] = (buf[3 + offset] & 0xFF) | ((buf[2 + offset] & 0xFF) << 8) |
+		                  ((buf[1 + offset] & 0xFF) << 16) | ((buf[0 + offset] & 0xFF) << 24);  
+		   offset += 4;
+		   }
+		   return intArr;
+		}
+	
 	private byte[] RobertsFilter(byte[] dataIn){
 		byte[] dataOut = new byte[dataIn.length];
-		byte temp1,temp2 = 0;
+		byte temp1,temp2,temp3 = 0;
+		byte sR = 1;//shift Red
+		byte sG = 2;//
+		byte sB = 3;//
 		
 		for (int i=0;i<previewSize.width*(previewSize.height-1)-1;i++){
-				//dataOut[4*i] = (byte) 0;//R
-				//dataOut[4*i+1] = (byte) 255;//G
-				//dataOut[4*i+2] = (byte) 0;//B
-				
-				temp1 = (byte) Math.abs(dataIn[4*i] - dataIn[4*(i+1) + previewSize.width*4]);
-				temp2 = (byte) Math.abs(dataIn[4*(i+1)] - dataIn[4*i + previewSize.width*4]);
-				dataOut[4*i] = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);
-				
-				temp1 = (byte) Math.abs(dataIn[4*i+2] - dataIn[4*(i+1) + previewSize.width*4 +1]);
-				temp2 = (byte) Math.abs(dataIn[4*(i+1)+1] - dataIn[4*i + previewSize.width*4 +1]);
-				dataOut[4*i+1] = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);
-				
-				temp1 = (byte) Math.abs(dataIn[4*i+2] - dataIn[4*(i+1) + previewSize.width*4 +2]);
-				temp2 = (byte) Math.abs(dataIn[4*(i+1)+2] - dataIn[4*i + previewSize.width*4 +2]);
-				dataOut[4*i+2] = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);
+
+			dataOut[i<<2]=(byte) 0xff;
+			
+			temp1 = (byte) (dataIn[sR + (i<<2)] - dataIn[sR + ((i+1)<<2) + (previewSize.width<<2)]);
+			temp2 = (byte) (dataIn[sR + ((i+1)<<2)] - dataIn[sR + (i<<2) + (previewSize.width<<2)]);
+			temp3 = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);
+			dataOut[sR+(i<<2)]=(byte) (temp3);
+			
+			temp1 = (byte) (dataIn[sG + (i<<2)] - dataIn[sG + ((i+1)<<2) + (previewSize.width<<2)]);
+			temp2 = (byte) (dataIn[sG + ((i+1)<<2)] - dataIn[sG + (i<<2) + (previewSize.width<<2)]);
+			temp3 = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);
+			dataOut[sG+(i<<2)]=(byte) (temp3);
+			
+			temp1 = (byte) (dataIn[sB + (i<<2)] - dataIn[sB + ((i+1)<<2) + (previewSize.width<<2)]);
+			temp2 = (byte) (dataIn[sB + ((i+1)<<2)] - dataIn[sB + (i<<2) + (previewSize.width<<2)]);
+			temp3 = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);
+			dataOut[sB+(i<<2)]=(byte) (temp3);
 		}
 		return dataOut;
 	}
 	
-	private int[] RobertsFilter(int[] dataIn){
+	private int[] RobertsFilter(int[] dataIn){//not right works
 		int[] dataOut = new int[dataIn.length];
-		int temp1,temp2 = 0;
-		byte R,G,B;
+		byte[][] R = new byte[2][2];
+		byte[][] G = new byte[2][2];
+		byte[][] B = new byte[2][2];
+		byte r,g,b;
 		
 		for (int i=0;i<previewSize.width*(previewSize.height-1)-1;i++){
 			
-				R = (byte) ((dataIn[i] & 0x00ff0000)>>16);
-				G = (byte) ((dataIn[i] & 0x0000ff00)>>8);
-				B = (byte) (dataIn[i] & 0x000000ff);
+				R[0][0] = (byte) ((dataIn[i] & 0x00ff0000)>>16);
+				G[0][0] = (byte) ((dataIn[i] & 0x0000ff00)>>8);
+				B[0][0] = (byte) (dataIn[i] & 0x000000ff);
 				
-				dataOut[i] = (int)0x00000000 | (int)(R<<16) | (int)(G<<8) | (int)B;
-				/*
-				temp1 = Math.abs(dataIn[4*i] - dataIn[4*(i+1) + previewSize.width*4]);
-				temp2 = Math.abs(dataIn[4*(i+1)] - dataIn[4*i + previewSize.width*4]);
-				dataOut[4*i] = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);
+				R[1][1] = (byte) ((dataIn[i+previewSize.width+1] & 0x00ff0000)>>16);
+				G[1][1] = (byte) ((dataIn[i+previewSize.width+1] & 0x0000ff00)>>8);
+				B[1][1] = (byte) (dataIn[i+previewSize.width+1] & 0x000000ff);
 				
-				temp1 = (byte) Math.abs(dataIn[4*i+2] - dataIn[4*(i+1) + previewSize.width*4 +1]);
-				temp2 = (byte) Math.abs(dataIn[4*(i+1)+1] - dataIn[4*i + previewSize.width*4 +1]);
-				dataOut[4*i+1] = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);
+				R[0][1] = (byte) ((dataIn[i+previewSize.width] & 0x00ff0000)>>16);
+				G[0][1] = (byte) ((dataIn[i+previewSize.width] & 0x0000ff00)>>8);
+				B[0][1] = (byte) (dataIn[i+previewSize.width] & 0x000000ff);
 				
-				temp1 = (byte) Math.abs(dataIn[4*i+2] - dataIn[4*(i+1) + previewSize.width*4 +2]);
-				temp2 = (byte) Math.abs(dataIn[4*(i+1)+2] - dataIn[4*i + previewSize.width*4 +2]);
-				dataOut[4*i+2] = (byte) Math.sqrt(temp1*temp1 + temp2*temp2);*/
+				R[1][0] = (byte) ((dataIn[i+1] & 0x00ff0000)>>16);
+				G[1][0] = (byte) ((dataIn[i+1] & 0x0000ff00)>>8);
+				B[1][0] = (byte) (dataIn[i+1] & 0x000000ff);
+				
+				r = (byte) Math.sqrt((R[0][0] - R[1][1])*(R[0][0] - R[1][1]) + 
+						(R[1][0] - R[0][1])*(R[1][0] - R[0][1]));
+				
+				g = (byte) Math.sqrt((G[0][0] - G[1][1])*(G[0][0] - G[1][1]) + 
+						(G[1][0] - G[0][1])*(G[1][0] - G[0][1]));
+				
+				b = (byte) Math.sqrt((B[0][0] - B[1][1])*(B[0][0] - B[1][1]) + 
+						(B[1][0] - B[0][1])*(B[1][0] - B[0][1]));
+				
+				dataOut[i] = 0xff000000 | (r<<16)&0xff0000 | (g<<8)&0xff00 | b & 0xff;
 		}
 		return dataOut;
 	}
@@ -228,9 +259,10 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
                b = 262143;  
 
             //rgb[yp] = 0xff000000 | ((r << 6) & 0xff0000) | ((g >> 2) & 0xff00) | ((b >> 10) & 0xff);
-            rgb[4*yp] = (byte) (r>>10);
-            rgb[4*yp+1] = (byte) (g >> 10);
-            rgb[4*yp+2] = (byte) (b >> 10); 
+            rgb[4*yp] = (byte) 0xff;
+            rgb[4*yp+1] = (byte) (r >> 10);
+            rgb[4*yp+2] = (byte) (g >> 10);
+            rgb[4*yp+3] = (byte) (b >> 10);
           }  
         }  
       }

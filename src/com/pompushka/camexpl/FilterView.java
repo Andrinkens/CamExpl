@@ -32,7 +32,7 @@ public class FilterView extends SurfaceView implements SurfaceHolder.Callback{
         canvas.drawBitmap(bmp, matrix, null);
         sh.unlockCanvasAndPost(canvas);
 
-		Log.d(TAG, "Surface bmp obtain");
+		//Log.d(TAG, "Surface bmp obtain");
 	}
 	
 	@Override
